@@ -27,6 +27,10 @@ def load_data(ticker):
         df = empresa.insider_transactions
         
         if df is not None and not df.empty:
+            # Remover as colunas especificadas
+            columns_to_remove = ["URL", "Transaction", "Ownership"]
+            df = df.drop(columns=[col for col in columns_to_remove if col in df.columns])
+            
             df['Value'] = df['Value'].apply(clean_value)
             
             df_venda = df[df["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
@@ -141,6 +145,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
 
 
 

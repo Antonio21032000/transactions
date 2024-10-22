@@ -22,35 +22,48 @@ def format_currency(value):
 def load_data(ticker):
     try:
         empresa = yf.Ticker(ticker)
-        # Get all available insider transactions
-        df = empresa.get_insider_transactions()
+        df = empresa.insider_transactions
         
         if df is not None and not df.empty:
-            # Convert Start Date to datetime
-            df['Date'] = pd.to_datetime(df['Date'])
+            # Convert Start Date to datetime and ensure it's working with the right column
+            if 'Start Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Start Date'])
+            elif 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+            else:
+                st.error("Date column not found in the data")
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
             # Filter for dates from 2019-01-01 onwards
-            date_filter = pd.Timestamp('2019-01-01')
-            df_filtered = df[df['Date'] >= date_filter]
+            date_filter = pd.to_datetime('2019-01-01')
+            df_filtered = df[df['Date'] >= date_filter].copy()
             
-            df_filtered['Value'] = df_filtered['Value'].apply(clean_value)
-            
-            # Separate sales and purchases
-            df_venda = df_filtered[df_filtered['Type'].str.contains('Sale', na=False, case=False)].reset_index(drop=True)
-            df_compra = df_filtered[df_filtered['Type'].str.contains('Purchase|Buy', na=False, case=False)].reset_index(drop=True)
+            if 'Text' in df_filtered.columns:
+                df_venda = df_filtered[df_filtered['Text'].str.contains('Sale', na=False, case=False)].copy()
+                df_compra = df_filtered[df_filtered['Text'].str.contains('Purchase|Buy', na=False, case=False)].copy()
+            elif 'Type' in df_filtered.columns:
+                df_venda = df_filtered[df_filtered['Type'].str.contains('Sale', na=False, case=False)].copy()
+                df_compra = df_filtered[df_filtered['Type'].str.contains('Purchase|Buy', na=False, case=False)].copy()
             
             # Sort by date descending
             df_venda = df_venda.sort_values('Date', ascending=False).reset_index(drop=True)
             df_compra = df_compra.sort_values('Date', ascending=False).reset_index(drop=True)
             
-            df_agrupado_venda = df_venda.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
-            df_agrupado_compra = df_compra.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
+            # Clean and format value column
+            for df in [df_venda, df_compra]:
+                if 'Value' in df.columns:
+                    df['Value'] = df['Value'].apply(clean_value)
             
-            # Format the currency values
+            # Create aggregated views
+            df_agrupado_venda = df_venda.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
+            df_agrupado_compra = df_compra.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
+            
+            # Format values for display
             for df in [df_venda, df_compra, df_agrupado_venda, df_agrupado_compra]:
-                df['Value'] = df['Value'].apply(format_currency)
+                if 'Value' in df.columns:
+                    df['Value'] = df['Value'].apply(format_currency)
             
-            # Format dates in the display dataframes
+            # Format dates for display
             if not df_venda.empty:
                 df_venda['Date'] = df_venda['Date'].dt.strftime('%Y-%m-%d')
             if not df_compra.empty:

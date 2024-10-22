@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -49,7 +48,7 @@ def load_data(ticker):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def display_table(title, df):
-    st.subheader(title)
+    st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
         st.info(f"No data available for {title}.")
     else:
@@ -108,6 +107,11 @@ def main():
             color: {TEXT_COLOR};
             background-color: white;
             border-radius: 5px;
+            font-size: 16px;
+        }}
+        .stTextInput>label {{
+            color: white !important;
+            font-size: 16px !important;
         }}
         .stDataFrame {{
             background-color: white;
@@ -130,12 +134,11 @@ def main():
         .stDataFrame tr:nth-of-type(even) {{
             background-color: #f8f8f8 !important;
         }}
-        .stSubheader {{
+        h1, h2, h3, h4, h5, h6, .stMarkdown {{
             color: white !important;
-            font-size: 1.5rem !important;
-            font-weight: bold !important;
-            margin-top: 2rem !important;
-            margin-bottom: 1rem !important;
+        }}
+        p {{
+            color: white !important;
         }}
         </style>
         """, unsafe_allow_html=True)
@@ -157,7 +160,7 @@ def main():
 
     # Footer information with new styling
     st.markdown(f"""
-    <div style="font-size: 16px; color: white; margin-top: 50px; background-color: {BG_COLOR}; padding: 20px; border-radius: 10px;">
+    <div style="font-size: 16px; color: white; margin-top: 50px; background-color: rgba(16, 47, 70, 0.6); padding: 20px; border-radius: 10px;">
     <strong>About the Data:</strong>
     <br>
     All data presented in this application is obtained through the Yahoo Finance API (yfinance).

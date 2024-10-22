@@ -28,8 +28,8 @@ def load_data(ticker):
             # Convert Start Date to datetime
             df['Start Date'] = pd.to_datetime(df['Start Date'])
             
-            # Filter for dates from 2023-01-01 onwards
-            date_filter = '2023-01-01'
+            # Filter for dates from 2019-01-01 onwards
+            date_filter = '2019-01-01'
             df = df[df['Start Date'] >= date_filter]
             
             columns_to_remove = ["URL", "Transaction", "Ownership"]
@@ -68,7 +68,7 @@ def load_data(ticker):
 def display_table(title, df):
     st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
-        st.info(f"No data available for {title} from 2023-01-01 onwards.")
+        st.info(f"No data available for {title} from 2019-01-01 onwards.")
     else:
         st.dataframe(df, height=400, use_container_width=True)
     
@@ -169,7 +169,7 @@ def main():
     st.markdown('<div class="title-container"><h1>US Insider Analysis</h1></div>', unsafe_allow_html=True)
 
     # Add date filter information
-    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2023 onwards</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
 
     # Input section with improved styling
     ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "AAPL")
@@ -200,7 +200,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 

@@ -25,13 +25,6 @@ def load_data(ticker):
         df = empresa.insider_transactions
         
         if df is not None and not df.empty:
-            # Print initial data range for verification
-            with st.expander("Debug Information"):
-                st.write("Data range before filtering:")
-                st.write(f"Earliest date: {df['Start Date'].min()}")
-                st.write(f"Latest date: {df['Start Date'].max()}")
-                st.write(f"Total transactions: {len(df)}")
-            
             # Convert Start Date to datetime
             df['Start Date'] = pd.to_datetime(df['Start Date'])
             
@@ -111,7 +104,7 @@ def main():
             border: none;
             padding: 0.75rem 2rem;
             transition: background-color 0.3s;
-            width: 100%;
+            width: 200px;
             margin-top: 5px;
         }}
         .stButton>button:hover {{
@@ -136,6 +129,7 @@ def main():
             border-radius: 5px;
             font-size: 16px;
             padding: 0.75rem;
+            width: 300px;
         }}
         .stTextInput>label {{
             color: white !important;
@@ -175,12 +169,6 @@ def main():
         div[data-testid="stToolbar"] {{
             display: none;
         }}
-        .input-container {{
-            display: flex;
-            align-items: flex-end;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }}
         </style>
         """, unsafe_allow_html=True)
 
@@ -190,22 +178,20 @@ def main():
     # Add date filter information
     st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
 
-    # Create a container for input and button
-    col1, col2, col3 = st.columns([3, 1, 3])
+    # Input and button in the left side
+    ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "")
     
-    with col2:
-        ticker = st.text_input("Enter stock ticker", "")
-        if st.button("Analyze"):
-            if ticker:
-                with st.spinner('Loading data...'):
-                    df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker.upper())
+    if st.button("Analyze"):
+        if ticker:
+            with st.spinner('Loading data...'):
+                df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker.upper())
 
-                display_table("Sales Transactions", df_venda)
-                display_table("Purchase Transactions", df_compra)
-                display_table("Aggregated Sales by Insider", df_agrupado_venda)
-                display_table("Aggregated Purchases by Insider", df_agrupado_compra)
-            else:
-                st.warning("Please enter a ticker symbol")
+            display_table("Sales Transactions", df_venda)
+            display_table("Purchase Transactions", df_compra)
+            display_table("Aggregated Sales by Insider", df_agrupado_venda)
+            display_table("Aggregated Purchases by Insider", df_agrupado_compra)
+        else:
+            st.warning("Please enter a ticker symbol")
 
     # Footer information with new styling
     st.markdown(f"""

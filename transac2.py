@@ -26,10 +26,11 @@ def load_data(ticker):
         
         if df is not None and not df.empty:
             # Print initial data range for verification
-            st.write("Data range before filtering:")
-            st.write(f"Earliest date: {df['Start Date'].min()}")
-            st.write(f"Latest date: {df['Start Date'].max()}")
-            st.write(f"Total transactions: {len(df)}")
+            with st.expander("Debug Information"):
+                st.write("Data range before filtering:")
+                st.write(f"Earliest date: {df['Start Date'].min()}")
+                st.write(f"Latest date: {df['Start Date'].max()}")
+                st.write(f"Total transactions: {len(df)}")
             
             # Convert Start Date to datetime
             df['Start Date'] = pd.to_datetime(df['Start Date'])
@@ -38,12 +39,6 @@ def load_data(ticker):
             date_filter = '2019-01-01'
             df_filtered = df[df['Start Date'] >= date_filter]
             
-            # Print filtered data range for verification
-            st.write("\nData range after filtering from 2019:")
-            st.write(f"Earliest date: {df_filtered['Start Date'].min()}")
-            st.write(f"Latest date: {df_filtered['Start Date'].max()}")
-            st.write(f"Total transactions: {len(df_filtered)}")
-            
             columns_to_remove = ["URL", "Transaction", "Ownership"]
             df_filtered = df_filtered.drop(columns=[col for col in columns_to_remove if col in df_filtered.columns])
             
@@ -51,11 +46,6 @@ def load_data(ticker):
             
             df_venda = df_filtered[df_filtered["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
             df_compra = df_filtered[df_filtered["Text"].str.contains("Purchase", na=False, case=False)].reset_index(drop=True)
-            
-            # Print transaction counts for verification
-            st.write("\nTransaction counts:")
-            st.write(f"Sales transactions: {len(df_venda)}")
-            st.write(f"Purchase transactions: {len(df_compra)}")
             
             # Sort by date descending
             df_venda = df_venda.sort_values('Start Date', ascending=False).reset_index(drop=True)
@@ -71,15 +61,8 @@ def load_data(ticker):
             # Format dates in the display dataframes
             if not df_venda.empty:
                 df_venda['Start Date'] = df_venda['Start Date'].dt.strftime('%Y-%m-%d')
-                st.write("\nSales date range:")
-                st.write(f"Earliest sale: {df_venda['Start Date'].min()}")
-                st.write(f"Latest sale: {df_venda['Start Date'].max()}")
-            
             if not df_compra.empty:
                 df_compra['Start Date'] = df_compra['Start Date'].dt.strftime('%Y-%m-%d')
-                st.write("\nPurchase date range:")
-                st.write(f"Earliest purchase: {df_compra['Start Date'].min()}")
-                st.write(f"Latest purchase: {df_compra['Start Date'].max()}")
             
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
@@ -121,16 +104,18 @@ def main():
             background-color: {BG_COLOR};
         }}
         .stButton>button {{
-            color: {TITLE_BG_COLOR};
-            background-color: white;
+            color: white;
+            background-color: {TITLE_BG_COLOR};
             border-radius: 5px;
             font-weight: bold;
             border: none;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 2rem;
             transition: background-color 0.3s;
+            width: 100%;
+            margin-top: 5px;
         }}
         .stButton>button:hover {{
-            background-color: #f0f0f0;
+            background-color: #b8952d;
         }}
         .title-container {{
             background-color: {TITLE_BG_COLOR};
@@ -150,6 +135,7 @@ def main():
             background-color: white;
             border-radius: 5px;
             font-size: 16px;
+            padding: 0.75rem;
         }}
         .stTextInput>label {{
             color: white !important;
@@ -186,6 +172,15 @@ def main():
             background-color: rgba(255, 255, 255, 0.1) !important;
             color: white !important;
         }}
+        div[data-testid="stToolbar"] {{
+            display: none;
+        }}
+        .input-container {{
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }}
         </style>
         """, unsafe_allow_html=True)
 
@@ -195,32 +190,22 @@ def main():
     # Add date filter information
     st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
 
-    # Create three columns
-    col1, col2, col3 = st.columns(3)
+    # Create a container for input and button
+    col1, col2, col3 = st.columns([3, 1, 3])
     
-    # Input section with improved styling
-    with col1:
-        ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "AAPL")
-
     with col2:
-        analyze_button = st.button("Analyze")
+        ticker = st.text_input("Enter stock ticker", "")
+        if st.button("Analyze"):
+            if ticker:
+                with st.spinner('Loading data...'):
+                    df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker.upper())
 
-    if analyze_button:
-        with st.spinner('Loading data...'):
-            df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker)
-
-        # Display Debug Info in an expander
-        with st.expander("Debug Information"):
-            st.markdown("### Date Range Verification")
-            if not df_venda.empty or not df_compra.empty:
-                st.write("Data successfully loaded and filtered")
+                display_table("Sales Transactions", df_venda)
+                display_table("Purchase Transactions", df_compra)
+                display_table("Aggregated Sales by Insider", df_agrupado_venda)
+                display_table("Aggregated Purchases by Insider", df_agrupado_compra)
             else:
-                st.write("No data available for the selected date range")
-
-        display_table("Sales Transactions", df_venda)
-        display_table("Purchase Transactions", df_compra)
-        display_table("Aggregated Sales by Insider", df_agrupado_venda)
-        display_table("Aggregated Purchases by Insider", df_agrupado_compra)
+                st.warning("Please enter a ticker symbol")
 
     # Footer information with new styling
     st.markdown(f"""
@@ -239,7 +224,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 

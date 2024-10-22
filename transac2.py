@@ -25,6 +25,13 @@ def load_data(ticker):
         df = empresa.insider_transactions
         
         if df is not None and not df.empty:
+            # Convert Start Date to datetime
+            df['Start Date'] = pd.to_datetime(df['Start Date'])
+            
+            # Filter for dates from 2023-01-01 onwards
+            date_filter = '2023-01-01'
+            df = df[df['Start Date'] >= date_filter]
+            
             columns_to_remove = ["URL", "Transaction", "Ownership"]
             df = df.drop(columns=[col for col in columns_to_remove if col in df.columns])
             
@@ -33,11 +40,22 @@ def load_data(ticker):
             df_venda = df[df["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
             df_compra = df[df["Text"].str.contains("Purchase", na=False, case=False)].reset_index(drop=True)
             
+            # Sort by date descending
+            df_venda = df_venda.sort_values('Start Date', ascending=False).reset_index(drop=True)
+            df_compra = df_compra.sort_values('Start Date', ascending=False).reset_index(drop=True)
+            
             df_agrupado_venda = df_venda.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
             df_agrupado_compra = df_compra.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
             
+            # Format the currency values
             for df in [df_venda, df_compra, df_agrupado_venda, df_agrupado_compra]:
                 df['Value'] = df['Value'].apply(format_currency)
+            
+            # Format dates in the display dataframes
+            if not df_venda.empty:
+                df_venda['Start Date'] = df_venda['Start Date'].dt.strftime('%Y-%m-%d')
+            if not df_compra.empty:
+                df_compra['Start Date'] = df_compra['Start Date'].dt.strftime('%Y-%m-%d')
             
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
@@ -50,7 +68,7 @@ def load_data(ticker):
 def display_table(title, df):
     st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
-        st.info(f"No data available for {title}.")
+        st.info(f"No data available for {title} from 2023-01-01 onwards.")
     else:
         st.dataframe(df, height=400, use_container_width=True)
     
@@ -140,11 +158,18 @@ def main():
         p {{
             color: white !important;
         }}
+        .stAlert {{
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }}
         </style>
         """, unsafe_allow_html=True)
 
     # Title with new styling
     st.markdown('<div class="title-container"><h1>US Insider Analysis</h1></div>', unsafe_allow_html=True)
+
+    # Add date filter information
+    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2023 onwards</p>', unsafe_allow_html=True)
 
     # Input section with improved styling
     ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "AAPL")

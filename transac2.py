@@ -69,6 +69,13 @@ def load_data(ticker):
             if not df_compra.empty:
                 df_compra['Date'] = df_compra['Date'].dt.strftime('%Y-%m-%d')
             
+            # Remove URL and Transaction columns from all dataframes
+            columns_to_drop = ['URL', 'Transaction']
+            for df in [df_venda, df_compra]:
+                for col in columns_to_drop:
+                    if col in df.columns:
+                        df.drop(columns=[col], inplace=True)
+            
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
             st.warning(f"No insider transaction data found for ticker {ticker}.")

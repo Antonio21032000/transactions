@@ -34,9 +34,8 @@ def load_data(ticker):
                 st.error("Date column not found in the data")
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
-            # Filter for dates from 2019-01-01 onwards
-            date_filter = pd.to_datetime('2019-01-01')
-            df_filtered = df[df['Date'] >= date_filter].copy()
+            # No date filtering - use all available data
+            df_filtered = df.copy()
             
             if 'Text' in df_filtered.columns:
                 df_venda = df_filtered[df_filtered['Text'].str.contains('Sale', na=False, case=False)].copy()

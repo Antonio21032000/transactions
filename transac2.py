@@ -73,9 +73,7 @@ def display_table(title, df):
         st.dataframe(df, height=400, use_container_width=True)
     
     st.markdown(f"""
-    <div style="font-size: 14px; color: white;">
-    Source: Yahoo Finance (yfinance)
-    <br>
+    <div style="font-size: 12px; color: #999999;">
     Last update: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
     </div>
     """, unsafe_allow_html=True)
@@ -193,26 +191,12 @@ def main():
         else:
             st.warning("Please enter a ticker symbol")
 
-    # Footer information with new styling
-    st.markdown(f"""
-    <div style="font-size: 16px; color: white; margin-top: 50px; background-color: rgba(16, 47, 70, 0.6); padding: 20px; border-radius: 10px;">
-    <strong>About the Data:</strong>
-    <br>
-    All data presented in this application is obtained through the Yahoo Finance API (yfinance).
-    <br>
-    Yahoo Finance collects this information from various sources, including SEC reports (for US companies) and other official sources.
-    <br>
-    The accuracy and timeliness of the data depend on the original source and Yahoo Finance's collection process.
-    <br>
+    # Footer with just the regulatory note
+    st.markdown("""
+    <div style="position: fixed; bottom: 0; width: 100%; background-color: rgba(16, 47, 70, 0.9); padding: 10px; text-align: center; font-size: 12px; color: #999999;">
     For more detailed information or verification of specific data, please consult official company reports or regulatory sources.
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-

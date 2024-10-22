@@ -80,7 +80,7 @@ def load_data(ticker):
 def display_table(title, df):
     st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
-        st.info(f"No data available for {title} from 2019-01-01 onwards.")
+        st.info(f"No data available for {title}")
     else:
         st.dataframe(df, height=400, use_container_width=True)
 
@@ -178,9 +178,6 @@ def main():
 
     # Title with new styling
     st.markdown('<div class="title-container"><h1>US Insider Analysis</h1></div>', unsafe_allow_html=True)
-
-    # Add date filter information
-    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
 
     # Input and button in the left side
     ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "")

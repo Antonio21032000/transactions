@@ -25,20 +25,37 @@ def load_data(ticker):
         df = empresa.insider_transactions
         
         if df is not None and not df.empty:
+            # Print initial data range for verification
+            st.write("Data range before filtering:")
+            st.write(f"Earliest date: {df['Start Date'].min()}")
+            st.write(f"Latest date: {df['Start Date'].max()}")
+            st.write(f"Total transactions: {len(df)}")
+            
             # Convert Start Date to datetime
             df['Start Date'] = pd.to_datetime(df['Start Date'])
             
             # Filter for dates from 2019-01-01 onwards
             date_filter = '2019-01-01'
-            df = df[df['Start Date'] >= date_filter]
+            df_filtered = df[df['Start Date'] >= date_filter]
+            
+            # Print filtered data range for verification
+            st.write("\nData range after filtering from 2019:")
+            st.write(f"Earliest date: {df_filtered['Start Date'].min()}")
+            st.write(f"Latest date: {df_filtered['Start Date'].max()}")
+            st.write(f"Total transactions: {len(df_filtered)}")
             
             columns_to_remove = ["URL", "Transaction", "Ownership"]
-            df = df.drop(columns=[col for col in columns_to_remove if col in df.columns])
+            df_filtered = df_filtered.drop(columns=[col for col in columns_to_remove if col in df_filtered.columns])
             
-            df['Value'] = df['Value'].apply(clean_value)
+            df_filtered['Value'] = df_filtered['Value'].apply(clean_value)
             
-            df_venda = df[df["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
-            df_compra = df[df["Text"].str.contains("Purchase", na=False, case=False)].reset_index(drop=True)
+            df_venda = df_filtered[df_filtered["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
+            df_compra = df_filtered[df_filtered["Text"].str.contains("Purchase", na=False, case=False)].reset_index(drop=True)
+            
+            # Print transaction counts for verification
+            st.write("\nTransaction counts:")
+            st.write(f"Sales transactions: {len(df_venda)}")
+            st.write(f"Purchase transactions: {len(df_compra)}")
             
             # Sort by date descending
             df_venda = df_venda.sort_values('Start Date', ascending=False).reset_index(drop=True)
@@ -54,8 +71,15 @@ def load_data(ticker):
             # Format dates in the display dataframes
             if not df_venda.empty:
                 df_venda['Start Date'] = df_venda['Start Date'].dt.strftime('%Y-%m-%d')
+                st.write("\nSales date range:")
+                st.write(f"Earliest sale: {df_venda['Start Date'].min()}")
+                st.write(f"Latest sale: {df_venda['Start Date'].max()}")
+            
             if not df_compra.empty:
                 df_compra['Start Date'] = df_compra['Start Date'].dt.strftime('%Y-%m-%d')
+                st.write("\nPurchase date range:")
+                st.write(f"Earliest purchase: {df_compra['Start Date'].min()}")
+                st.write(f"Latest purchase: {df_compra['Start Date'].max()}")
             
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
@@ -171,12 +195,27 @@ def main():
     # Add date filter information
     st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
 
+    # Create three columns
+    col1, col2, col3 = st.columns(3)
+    
     # Input section with improved styling
-    ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "AAPL")
+    with col1:
+        ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "AAPL")
 
-    if st.button("Analyze"):
+    with col2:
+        analyze_button = st.button("Analyze")
+
+    if analyze_button:
         with st.spinner('Loading data...'):
             df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker)
+
+        # Display Debug Info in an expander
+        with st.expander("Debug Information"):
+            st.markdown("### Date Range Verification")
+            if not df_venda.empty or not df_compra.empty:
+                st.write("Data successfully loaded and filtered")
+            else:
+                st.write("No data available for the selected date range")
 
         display_table("Sales Transactions", df_venda)
         display_table("Purchase Transactions", df_compra)

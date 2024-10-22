@@ -2,15 +2,13 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
-from PIL import Image
+from io import BytesIO
 
-CORES_STK = {
-    'azul_escuro': '#102E46',
-    'dourado': '#C9BC2E',
-    'azul_claro': '#1090B2',
-    'preto': '#0B1B24',
-    'branco': '#FFFFFF'
-}
+# Updated Colors
+BG_COLOR = '#102F46'  # Dark blue for background
+TITLE_BG_COLOR = '#DAA657'  # Golden color for title background
+TITLE_TEXT_COLOR = 'white'
+TEXT_COLOR = '#333333'
 
 def clean_value(value):
     if isinstance(value, str):
@@ -27,119 +25,186 @@ def load_data(ticker):
         df = empresa.insider_transactions
         
         if df is not None and not df.empty:
-            # Remover as colunas especificadas
-            columns_to_remove = ["URL", "Transaction", "Ownership"]
-            df = df.drop(columns=[col for col in columns_to_remove if col in df.columns])
+            # Convert Start Date to datetime and ensure it's working with the right column
+            if 'Start Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Start Date'])
+            elif 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+            else:
+                st.error("Date column not found in the data")
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
-            df['Value'] = df['Value'].apply(clean_value)
+            # Filter for dates from 2019-01-01 onwards
+            date_filter = pd.to_datetime('2019-01-01')
+            df_filtered = df[df['Date'] >= date_filter].copy()
             
-            df_venda = df[df["Text"].str.contains("Sale", na=False, case=False)].reset_index(drop=True)
-            df_compra = df[df["Text"].str.contains("Purchase", na=False, case=False)].reset_index(drop=True)
+            if 'Text' in df_filtered.columns:
+                df_venda = df_filtered[df_filtered['Text'].str.contains('Sale', na=False, case=False)].copy()
+                df_compra = df_filtered[df_filtered['Text'].str.contains('Purchase|Buy', na=False, case=False)].copy()
+            elif 'Type' in df_filtered.columns:
+                df_venda = df_filtered[df_filtered['Type'].str.contains('Sale', na=False, case=False)].copy()
+                df_compra = df_filtered[df_filtered['Type'].str.contains('Purchase|Buy', na=False, case=False)].copy()
             
-            df_agrupado_venda = df_venda.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
-            df_agrupado_compra = df_compra.groupby("Insider")["Value"].sum().sort_values(ascending=False).reset_index()
+            # Sort by date descending
+            df_venda = df_venda.sort_values('Date', ascending=False).reset_index(drop=True)
+            df_compra = df_compra.sort_values('Date', ascending=False).reset_index(drop=True)
             
-            # Formatação de moeda após a agregação
+            # Clean and format value column
+            for df in [df_venda, df_compra]:
+                if 'Value' in df.columns:
+                    df['Value'] = df['Value'].apply(clean_value)
+            
+            # Create aggregated views
+            df_agrupado_venda = df_venda.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
+            df_agrupado_compra = df_compra.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
+            
+            # Format values for display
             for df in [df_venda, df_compra, df_agrupado_venda, df_agrupado_compra]:
-                df['Value'] = df['Value'].apply(format_currency)
+                if 'Value' in df.columns:
+                    df['Value'] = df['Value'].apply(format_currency)
+            
+            # Format dates for display
+            if not df_venda.empty:
+                df_venda['Date'] = df_venda['Date'].dt.strftime('%Y-%m-%d')
+            if not df_compra.empty:
+                df_compra['Date'] = df_compra['Date'].dt.strftime('%Y-%m-%d')
+            
+            # Remove URL and Transaction columns from all dataframes
+            columns_to_drop = ['URL', 'Transaction']
+            for df in [df_venda, df_compra]:
+                for col in columns_to_drop:
+                    if col in df.columns:
+                        df.drop(columns=[col], inplace=True)
             
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
-            st.warning(f"Não foram encontrados dados de transações de insiders para o ticker {ticker}.")
+            st.warning(f"No insider transaction data found for ticker {ticker}.")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     except Exception as e:
-        st.error(f"Erro ao carregar dados: {str(e)}")
+        st.error(f"Error loading data: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def display_table(title, df):
-    st.subheader(title)
+    st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
-        st.info(f"Não há dados disponíveis para {title}.")
+        st.info(f"No data available for {title}")
     else:
-        st.dataframe(
-            df.style
-            .set_properties(**{
-                'color': CORES_STK['branco'],
-                'background-color': CORES_STK['azul_escuro'],
-                'font-size': '16px',
-                'border': f'1px solid {CORES_STK["azul_claro"]}'
-            })
-            .set_table_styles([
-                {'selector': 'th', 'props': [
-                    ('color', CORES_STK['branco']),
-                    ('background-color', CORES_STK['azul_claro']),
-                    ('font-size', '18px'),
-                    ('font-weight', 'bold'),
-                    ('text-align', 'left')
-                ]},
-                {'selector': 'td', 'props': [
-                    ('text-align', 'left')
-                ]},
-            ]),
-            height=400,
-            use_container_width=True
-        )
-    st.markdown(f"""
-    <div style="font-size: 14px; color: {CORES_STK['branco']};">
-    Fonte: Yahoo Finance (yfinance)
-    <br>
-    Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
-    </div>
-    """, unsafe_allow_html=True)
+        st.dataframe(df, height=400, use_container_width=True)
 
 def main():
-    st.set_page_config(page_title="Análise de Transações de Insiders", layout="wide")
+    st.set_page_config(page_title="US Insider Analysis", layout="wide")
     
+    # Apply custom CSS styles
     st.markdown(f"""
-    <style>
+        <style>
+        .reportview-container .main .block-container{{
+            max-width: 1200px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            padding-left: 5rem;
+            padding-right: 5rem;
+        }}
         .stApp {{
-            background-color: {CORES_STK['azul_escuro']};
+            background-color: {BG_COLOR};
         }}
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 2px;
+        .stButton>button {{
+            color: white;
+            background-color: {TITLE_BG_COLOR};
+            border-radius: 5px;
+            font-weight: bold;
+            border: none;
+            padding: 0.75rem 2rem;
+            transition: background-color 0.3s;
+            width: 200px;
+            margin-top: 5px;
         }}
-        .stTabs [data-baseweb="tab"] {{
-            background-color: {CORES_STK['azul_claro']};
-            color: {CORES_STK['branco']};
+        .stButton>button:hover {{
+            background-color: #b8952d;
         }}
-        h1, h2, h3 {{
-            color: {CORES_STK['branco']};
+        .title-container {{
+            background-color: {TITLE_BG_COLOR};
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
         }}
-        .stTextInput > div > div > input {{
-            color: {CORES_STK['azul_escuro']};
-            font-size: 20px;
+        .title-container h1 {{
+            color: {TITLE_TEXT_COLOR};
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 0;
+        }}
+        .stTextInput>div>div>input {{
+            color: {TEXT_COLOR};
+            background-color: white;
+            border-radius: 5px;
+            font-size: 16px;
+            padding: 0.75rem;
+            width: 300px;
+        }}
+        .stTextInput>label {{
+            color: white !important;
+            font-size: 16px !important;
+        }}
+        .stDataFrame {{
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }}
+        .stDataFrame table {{
+            color: {TEXT_COLOR} !important;
+        }}
+        .stDataFrame th {{
+            background-color: {TITLE_BG_COLOR} !important;
+            color: {TITLE_TEXT_COLOR} !important;
+            padding: 0.5rem !important;
+        }}
+        .stDataFrame td {{
+            background-color: white !important;
+            padding: 0.5rem !important;
+        }}
+        .stDataFrame tr:nth-of-type(even) {{
+            background-color: #f8f8f8 !important;
+        }}
+        h1, h2, h3, h4, h5, h6, .stMarkdown {{
+            color: white !important;
         }}
         p {{
-            color: {CORES_STK['branco']};
-            font-size: 18px;
+            color: white !important;
         }}
-    </style>
-    """, unsafe_allow_html=True)
+        .stAlert {{
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }}
+        div[data-testid="stToolbar"] {{
+            display: none;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
 
-    st.title("Insiders (Buy and Sell) Analysis")
+    # Title with new styling
+    st.markdown('<div class="title-container"><h1>US Insider Analysis</h1></div>', unsafe_allow_html=True)
 
-    ticker = st.text_input("Digite o ticker da ação (ex: NVDA, AAPL, GOOGL)", "ECL")
+    # Input and button in the left side
+    ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "")
+    
+    if st.button("Analyze"):
+        if ticker:
+            with st.spinner('Loading data...'):
+                df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker.upper())
 
-    if st.button("Analisar"):
-        with st.spinner('Carregando dados...'):
-            df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker)
+            display_table("Sales Transactions", df_venda)
+            display_table("Purchase Transactions", df_compra)
+            display_table("Aggregated Sales by Insider", df_agrupado_venda)
+            display_table("Aggregated Purchases by Insider", df_agrupado_compra)
+        else:
+            st.warning("Please enter a ticker symbol")
 
-        display_table("Vendas", df_venda)
-        display_table("Compras", df_compra)
-        display_table("Agrupado por Venda", df_agrupado_venda)
-        display_table("Agrupado por Compra", df_agrupado_compra)
-
-    st.markdown(f"""
-    <div style="font-size: 16px; color: {CORES_STK['branco']}; margin-top: 50px;">
-    <strong>Sobre os dados:</strong>
-    <br>
-    Todos os dados apresentados nesta aplicação são obtidos através da API do Yahoo Finance (yfinance).
-    <br>
-    O Yahoo Finance coleta estas informações de várias fontes, incluindo relatórios da SEC (para empresas dos EUA) e outras fontes oficiais.
-    <br>
-    A precisão e atualidade dos dados dependem da fonte original e do processo de coleta do Yahoo Finance.
-    <br>
-    Para informações mais detalhadas ou verificação de dados específicos, recomenda-se consultar os relatórios oficiais da empresa ou fontes regulatórias.
+    # Footer with just the regulatory note
+    st.markdown("""
+    <div style="position: fixed; bottom: 0; width: 100%; background-color: rgba(16, 47, 70, 0.9); padding: 10px; text-align: center; font-size: 12px; color: #999999;">
+    For more detailed information or verification of specific data, please consult official company reports or regulatory sources.
     </div>
     """, unsafe_allow_html=True)
 

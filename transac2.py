@@ -12,11 +12,20 @@ TEXT_COLOR = '#333333'
 
 def clean_value(value):
     if isinstance(value, str):
-        return float(value.replace('$', '').replace(',', ''))
+        try:
+            return float(value.replace('$', '').replace(',', ''))
+        except:
+            return 0.0
     return float(value) if pd.notnull(value) else 0.0
 
 def format_currency(value):
     return f"${value:,.2f}" if pd.notnull(value) else "N/A"
+
+def convert_df_to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
 
 @st.cache_data
 def load_data(ticker):
@@ -34,8 +43,8 @@ def load_data(ticker):
                 st.error("Date column not found in the data")
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
-            # Filter for dates from 2019-01-01 onwards
-            date_filter = pd.to_datetime('2019-01-01')
+            # Filter for dates from 2023-01-01 onwards
+            date_filter = pd.to_datetime('2023-01-01')
             df_filtered = df[df['Date'] >= date_filter].copy()
             
             if 'Text' in df_filtered.columns:
@@ -52,22 +61,30 @@ def load_data(ticker):
             # Clean and format value column
             for df in [df_venda, df_compra]:
                 if 'Value' in df.columns:
-                    df['Value'] = df['Value'].apply(clean_value)
+                    df['Value_Float'] = df['Value'].apply(clean_value)  # Coluna numérica para ordenação
+                    df['Value_Display'] = df['Value'].apply(clean_value).apply(format_currency)  # Coluna formatada para exibição
             
             # Create aggregated views
-            df_agrupado_venda = df_venda.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
-            df_agrupado_compra = df_compra.groupby("Insider")['Value'].sum().sort_values(ascending=False).reset_index()
+            df_agrupado_venda = df_venda.groupby("Insider")['Value_Float'].sum().sort_values(ascending=False).reset_index()
+            df_agrupado_compra = df_compra.groupby("Insider")['Value_Float'].sum().sort_values(ascending=False).reset_index()
             
-            # Format values for display
-            for df in [df_venda, df_compra, df_agrupado_venda, df_agrupado_compra]:
-                if 'Value' in df.columns:
-                    df['Value'] = df['Value'].apply(format_currency)
+            # Format values for aggregated views
+            for df in [df_agrupado_venda, df_agrupado_compra]:
+                df['Value'] = df['Value_Float'].apply(format_currency)
+                df.drop('Value_Float', axis=1, inplace=True)
             
             # Format dates for display
             if not df_venda.empty:
                 df_venda['Date'] = df_venda['Date'].dt.strftime('%Y-%m-%d')
             if not df_compra.empty:
                 df_compra['Date'] = df_compra['Date'].dt.strftime('%Y-%m-%d')
+            
+            # Prepare final dataframes for display
+            display_columns = ['Date', 'Insider', 'Value_Display', 'Value_Float']
+            if not df_venda.empty:
+                df_venda = df_venda[display_columns].rename(columns={'Value_Display': 'Value'})
+            if not df_compra.empty:
+                df_compra = df_compra[display_columns].rename(columns={'Value_Display': 'Value'})
             
             return df_venda, df_compra, df_agrupado_venda, df_agrupado_compra
         else:
@@ -77,12 +94,23 @@ def load_data(ticker):
         st.error(f"Error loading data: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-def display_table(title, df):
+def display_table(title, df, download_text):
     st.markdown(f'<h2 style="color: white;">{title}</h2>', unsafe_allow_html=True)
     if df.empty:
-        st.info(f"No data available for {title} from 2019-01-01 onwards.")
+        st.info(f"No data available for {title} from January 1st, 2023 onwards.")
     else:
-        st.dataframe(df, height=400, use_container_width=True)
+        # Create a copy without the Value_Float column for display
+        display_df = df.drop('Value_Float', axis=1) if 'Value_Float' in df.columns else df
+        st.dataframe(display_df, height=400, use_container_width=True)
+        
+        # Add download button
+        excel_data = convert_df_to_excel(display_df)
+        st.download_button(
+            label=f"Download {download_text}",
+            data=excel_data,
+            file_name=f'{download_text.lower().replace(" ", "_")}.xlsx',
+            mime='application/vnd.ms-excel',
+        )
 
 def main():
     st.set_page_config(page_title="US Insider Analysis", layout="wide")
@@ -111,7 +139,17 @@ def main():
             width: 200px;
             margin-top: 5px;
         }}
-        .stButton>button:hover {{
+        .stDownloadButton>button {{
+            color: white;
+            background-color: {TITLE_BG_COLOR};
+            border-radius: 5px;
+            font-weight: bold;
+            border: none;
+            padding: 0.5rem 1rem;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }}
+        .stButton>button:hover, .stDownloadButton>button:hover {{
             background-color: #b8952d;
         }}
         .title-container {{
@@ -180,7 +218,7 @@ def main():
     st.markdown('<div class="title-container"><h1>US Insider Analysis</h1></div>', unsafe_allow_html=True)
 
     # Add date filter information
-    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2019 onwards</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color: white; text-align: center;">Showing transactions from January 1st, 2023 onwards</p>', unsafe_allow_html=True)
 
     # Input and button in the left side
     ticker = st.text_input("Enter stock ticker (e.g., NVDA, AAPL, GOOGL)", "")
@@ -190,10 +228,10 @@ def main():
             with st.spinner('Loading data...'):
                 df_venda, df_compra, df_agrupado_venda, df_agrupado_compra = load_data(ticker.upper())
 
-            display_table("Sales Transactions", df_venda)
-            display_table("Purchase Transactions", df_compra)
-            display_table("Aggregated Sales by Insider", df_agrupado_venda)
-            display_table("Aggregated Purchases by Insider", df_agrupado_compra)
+            display_table("Sales Transactions", df_venda, "Sales Data")
+            display_table("Purchase Transactions", df_compra, "Purchase Data")
+            display_table("Aggregated Sales by Insider", df_agrupado_venda, "Aggregated Sales Data")
+            display_table("Aggregated Purchases by Insider", df_agrupado_compra, "Aggregated Purchase Data")
         else:
             st.warning("Please enter a ticker symbol")
 
